@@ -1,9 +1,11 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDFTools - Easy online PDF utilities</title>
+    <title> {% block title %}PDFTools - Easy online PDF utilities{% endblock %} </title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -581,7 +583,7 @@
             </ul>
             
             <div class="nav-actions">
-                <a href="#" class="btn-signin">Sign in</a>
+                <a href="{% url 'applike:auth' %}" class="btn-signin">Sign in</a>
                 <a href="#" class="btn-pricing">Pricing</a>
                 <a href="#" class="btn-upload">Upload</a>
             </div>
@@ -593,6 +595,8 @@
             </div>
         </div>
     </nav>
+
+    {% block content %}
 
     <!-- Hero Section -->
     <section class="hero">
@@ -641,7 +645,8 @@
             </div>
         </div>
     </section>
-
+    
+    
     <!-- Upload Section -->
     <section class="upload-section">
         <div class="upload-card">
@@ -665,6 +670,7 @@
         </div>
     </section>
 
+    {% endblock %}
     <!-- Tools Grid -->
     <section class="tools-section" id="tools">
         <h2>All PDF Tools</h2>
