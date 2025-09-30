@@ -1,11 +1,147 @@
 {% extends "index.html" %}
 
-{% block title %}Compress {% endblock %}
-
-
+{% block title %}Merge {% endblock %}
 
 
 
 {% block content %}
+<section class="upload-section">
+    <div class="upload-card">
+         <form method="post" enctype="multipart/form-data" id="merge-form">
+            {% csrf_token %}
+            
+            <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>Drop your PDF files here</h3>
+                <p>or click to browse files from your computer</p>
+                
+                <!-- Django form input -->
+                {% comment %} {{ form.pdf_files }} {% endcomment %}
+                <input type="file" name="pdf_files" multiple>
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+            
+            <button type="submit" class="process-btn"  id="processBtn" >Merge PDFs</button>
+
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
+           
+        </form>
+
+
+<div id="progressContainer" style="display:none; width:300px; border:1px solid #ccc;">
+  <div id="progressFill" style="width:0; height:20px; background:green;"></div>
+</div>
+<p id="progressText"></p>
+
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+<script>
+const processBtn = document.getElementById("processBtn");
+const form = document.getElementById("merge-form");
+const progressContainer = document.getElementById("progressContainer");
+const progressFill = document.getElementById("progressFill");
+const progressText = document.getElementById("progressText");
+
+form.addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    if (form.querySelector('input[type="file"]').files.length === 0) {
+        Toastify({ text: "❌ Hech qanday fayl tanlanmadi!", backgroundColor: "red" }).showToast();
+        return;
+    }
+
+    processBtn.style.display = 'none';
+    progressContainer.style.display = 'block';
+
+    let formData = new FormData(form);
+    let response = await fetch("{% url 'applike:merge_pdfs' %}", 
+    {
+        method: "POST",
+        body: formData,
+        headers: { "X-CSRFToken": "{{ csrf_token }}" }
+    });
+
+    let result = await response.json();
+
+    if (!result.success) {
+        Toastify({ text: result.message, backgroundColor: "red" }).showToast();
+        processBtn.style.display = 'block';
+        progressContainer.style.display = 'none';
+        return;
+    }
+
+    // Progress animatsiya
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 100) {
+            progress = 100;
+            clearInterval(interval);
+
+            Toastify({ text: result.message, backgroundColor: "green" }).showToast();
+
+            setTimeout(() => {
+                window.location.href = result.download_url; // avtomatik yuklab olish
+                form.reset();
+                processBtn.style.display = 'block';
+                progressContainer.style.display = 'none';
+                progressFill.style.width = '0%';
+                progressText.textContent = '';
+            }, 1000);
+        }
+        progressFill.style.width = progress + '%';
+        progressText.textContent = Math.round(progress) + '%';
+    }, 200);
+});
+</script>
+
+    </div>
+</section>
+
+<!-- Toastify -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+<script>
+document.getElementById("merge-form").addEventListener("submit", async function(e) {
+    e.preventDefault();  // sahifa yangilanmasin
+
+    let formData = new FormData(this);
+
+    let response = await fetch("", {
+        method: "POST",
+        body: formData
+    });
+
+    // JSON kutamiz
+    let result = await response.json();
+
+    Toastify({
+        text: result.message,
+        duration: 3000,
+        gravity: "top",
+        position: "right",
+        backgroundColor: result.success ? "green" : "red",
+    }).showToast();
+});
+</script>
+
 
 {% endblock %} 
+
+
+
+
+
+
+
+
+

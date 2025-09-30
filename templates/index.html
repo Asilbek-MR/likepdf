@@ -367,10 +367,10 @@
             background: #c53030;
         }
 
-        .process-btn:disabled {
+        {% comment %} .process-btn:disabled {
             background: #cbd5e0;
             cursor: not-allowed;
-        }
+        } {% endcomment %}
 
         .progress-container {
             display: none;
@@ -575,7 +575,7 @@
             <a href="/" class="logo">PDFTools</a>
             
             <ul class="nav-links">
-                <li><a href="{% url 'applike:merge' %}">Merge PDF</a></li>
+                <li><a href="{% url 'applike:merge_pdfs' %}">Merge PDF</a></li>
                 <li><a href="{% url 'applike:split' %}">Split PDF</a></li>
                 <li><a href="{% url 'applike:compress' %}">Compress PDF</a></li>
                 <li><a href="{% url 'applike:convert' %}">Convert</a></li>
