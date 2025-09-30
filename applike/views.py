@@ -1,5 +1,10 @@
 from django.shortcuts import render
-
+# frontend/views.py
+import os
+from django.conf import settings
+from django.http import JsonResponse
+from django.shortcuts import render
+from .forms import PDFUploadForm
 # Create your views here.
 from django.http import HttpResponse
 
@@ -9,13 +14,39 @@ def home(request):
 def auth(request):
     return render(request, 'auth.html')
 
+def compress(request):
+    return render(request, 'compress.html')
 
-# frontend/views.py
-import os
-from django.conf import settings
-from django.http import JsonResponse
-from django.shortcuts import render
-from .forms import PDFUploadForm
+def convert(request):
+    return render(request,'convert.html')
+
+def editpdf(request):
+    return render(request, 'editpdf.html')
+
+def merge(request):
+    return render(request, 'merge.html')
+
+def pdftojpg(request):
+    return render(request,'pdftojpg.html')
+
+def pdftoword(request):
+    return render(request,'pdftoword.html')
+
+def price(request):
+    return render(request,'price.html')
+
+def protect(request):
+    return render(request,'protect.html')
+
+def signpdf(request):
+    return render(request,'signpdf.html')
+
+def split(request):
+    return render(request,'split.html')
+
+def unlock(request):
+    return render(request,'unlock.html')
+
 
 
 def upload_pdf(request):

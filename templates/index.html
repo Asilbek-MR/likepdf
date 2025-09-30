@@ -572,19 +572,19 @@
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="#" class="logo">PDFTools</a>
+            <a href="/" class="logo">PDFTools</a>
             
             <ul class="nav-links">
-                <li><a href="#merge">Merge PDF</a></li>
-                <li><a href="#split">Split PDF</a></li>
-                <li><a href="#compress">Compress PDF</a></li>
-                <li><a href="#convert">Convert</a></li>
+                <li><a href="{% url 'applike:merge' %}">Merge PDF</a></li>
+                <li><a href="{% url 'applike:split' %}">Split PDF</a></li>
+                <li><a href="{% url 'applike:compress' %}">Compress PDF</a></li>
+                <li><a href="{% url 'applike:convert' %}">Convert</a></li>
                 <li><a href="#tools">All tools</a></li>
             </ul>
             
             <div class="nav-actions">
                 <a href="{% url 'applike:auth' %}" class="btn-signin">Sign in</a>
-                <a href="#" class="btn-pricing">Pricing</a>
+                <a href="" class="btn-pricing">Pricing</a>
                 <a href="#" class="btn-upload">Upload</a>
             </div>
             
