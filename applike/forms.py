@@ -15,7 +15,6 @@ class PDFUploadForm(forms.Form):
 
 # frontend/forms.py
 class PDFMergeForm(forms.Form):
-    print("PDFMergeForm",'++++++++++++++')
     pdf_files = forms.FileField(
         widget=MultiFileInput(attrs={
             "id": "fileInput",             # sening HTML’dagi input bilan mos
