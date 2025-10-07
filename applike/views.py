@@ -19,6 +19,12 @@ def auth(request):
     return render(request, 'auth.html')
 
 
+# views.py - COMPLETE SOLUTION IN ONE FUNCTION
+from django.shortcuts import render
+from django.http import FileResponse, JsonResponse
+from PyPDF2 import PdfReader, PdfWriter
+import io
+import os
 import tempfile
 import subprocess
 import logging
@@ -112,6 +118,54 @@ def compress(request):
 
 def _compress_ghostscript(pdf_file, compression_level):
     """Ghostscript compression - 50-70% reduction"""
+    import shutil
+    
+    # Common Ghostscript paths (especially for macOS)
+    gs_executables = [
+        'gs',                                          # Default PATH
+        '/usr/local/bin/gs',                          # Homebrew Intel Mac
+        '/opt/homebrew/bin/gs',                       # Homebrew Apple Silicon Mac
+        '/usr/bin/gs',                                # Linux
+        shutil.which('gs'),                           # System PATH
+        'gswin64c',                                   # Windows 64-bit
+        'gswin32c',                                   # Windows 32-bit
+    ]
+    
+    # Remove None values from shutil.which
+    gs_executables = [x for x in gs_executables if x]
+    
+    gs_path = None
+    
+    # Try each path
+    for gs_exe in gs_executables:
+        if not gs_exe:
+            continue
+        try:
+            # Check if file exists first
+            if os.path.exists(gs_exe) or '/' not in gs_exe:
+                result = subprocess.run(
+                    [gs_exe, '--version'], 
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=5,
+                    env=dict(os.environ, PATH=os.environ.get('PATH', '') + ':/usr/local/bin:/opt/homebrew/bin')
+                )
+                if result.returncode == 0:
+                    gs_path = gs_exe
+                    logger.info(f"Found Ghostscript at: {gs_path} (version: {result.stdout.decode().strip()})")
+                    break
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError, PermissionError) as e:
+            logger.debug(f"Failed to find gs at {gs_exe}: {e}")
+            continue
+    
+    # If still not found, raise exception
+    if gs_path is None:
+        logger.error("Ghostscript not found in any location")
+        raise FileNotFoundError(
+            "Ghostscript not installed or not in PATH. "
+            "Install with: brew install ghostscript (macOS) or apt-get install ghostscript (Linux)"
+        )
+    
     quality_map = {
         'low': '/printer',
         'medium': '/ebook',
@@ -129,18 +183,51 @@ def _compress_ghostscript(pdf_file, compression_level):
     
     try:
         gs_command = [
-            'gs', '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.4',
-            f'-dPDFSETTINGS={quality}', '-dNOPAUSE', '-dQUIET', '-dBATCH',
-            '-dCompressFonts=true', '-dCompressPages=true',
-            f'-sOutputFile={output_path}', input_path
+            gs_path, 
+            '-sDEVICE=pdfwrite', 
+            '-dCompatibilityLevel=1.4',
+            f'-dPDFSETTINGS={quality}',
+            '-dNOPAUSE',
+            '-dQUIET',
+            '-dBATCH',
+            '-dCompressFonts=true',
+            '-dCompressPages=true',
+            '-dDownsampleColorImages=true',
+            '-dDownsampleGrayImages=true',
+            '-dColorImageResolution=150',
+            '-dGrayImageResolution=150',
+            f'-sOutputFile={output_path}',
+            input_path
         ]
         
-        subprocess.run(gs_command, check=True, timeout=60, capture_output=True)
+        # Add PATH to environment
+        env = dict(os.environ)
+        env['PATH'] = env.get('PATH', '') + ':/usr/local/bin:/opt/homebrew/bin'
+        
+        result = subprocess.run(
+            gs_command, 
+            check=True, 
+            timeout=60, 
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env
+        )
+        
+        # Check if output file was created
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise FileNotFoundError("Ghostscript failed to create output file")
         
         with open(output_path, 'rb') as f:
             buffer = io.BytesIO(f.read())
         
+        logger.info(f"Ghostscript compression successful using {gs_path}")
         return buffer
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode() if e.stderr else 'Unknown error'
+        logger.error(f"Ghostscript command failed: {error_msg}")
+        raise
+        
     finally:
         try:
             os.unlink(input_path)
@@ -151,7 +238,7 @@ def _compress_ghostscript(pdf_file, compression_level):
 
 
 def _compress_pikepdf(pdf_file, compression_level):
-    """pikepdf compression - 40-60% reduction"""
+    """pikepdf compression - 40-60% reduction - IMPROVED"""
     import pikepdf
     
     pdf_file.seek(0)
@@ -159,13 +246,60 @@ def _compress_pikepdf(pdf_file, compression_level):
     with pikepdf.open(pdf_file) as pdf:
         buffer = io.BytesIO()
         
+        # Remove metadata to reduce size
+        try:
+            with pdf.open_metadata(set_pikepdf_as_editor=False) as meta:
+                meta.clear()
+        except:
+            pass
+        
+        # Compress images in PDF
+        for page in pdf.pages:
+            try:
+                for image_key in list(page.images.keys()):
+                    try:
+                        raw_image = page.images[image_key]
+                        pdfimage = pikepdf.PdfImage(raw_image)
+                        
+                        # Get compression quality based on level
+                        if compression_level == 'high':
+                            quality = 50
+                        elif compression_level == 'medium':
+                            quality = 75
+                        else:
+                            quality = 85
+                        
+                        # Try to compress the image
+                        if pdfimage.mode in ['RGB', 'L', 'CMYK']:
+                            from PIL import Image
+                            pil_image = pdfimage.as_pil_image()
+                            
+                            # Resize if too large
+                            if compression_level == 'high' and (pil_image.width > 1200 or pil_image.height > 1200):
+                                pil_image.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+                            elif compression_level == 'medium' and (pil_image.width > 1600 or pil_image.height > 1600):
+                                pil_image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                            
+                            # Save compressed
+                            img_buffer = io.BytesIO()
+                            pil_image.save(img_buffer, format='JPEG', quality=quality, optimize=True)
+                            img_buffer.seek(0)
+                            
+                            # Replace in PDF
+                            raw_image.write(img_buffer.read(), filter=pikepdf.Name.DCTDecode)
+                    except Exception as e:
+                        logger.debug(f"Could not compress image: {e}")
+                        continue
+            except:
+                pass
+        
+        # Save with maximum compression (fixed: removed conflicting options)
         if compression_level == 'high':
             pdf.save(
                 buffer,
                 compress_streams=True,
                 stream_decode_level=pikepdf.StreamDecodeLevel.generalized,
                 object_stream_mode=pikepdf.ObjectStreamMode.generate,
-                normalize_content=True,
                 recompress_flate=True
             )
         elif compression_level == 'medium':
@@ -177,28 +311,47 @@ def _compress_pikepdf(pdf_file, compression_level):
                 recompress_flate=True
             )
         else:
-            pdf.save(buffer, compress_streams=True, recompress_flate=True)
+            pdf.save(
+                buffer,
+                compress_streams=True,
+                recompress_flate=True
+            )
         
+        logger.info("pikepdf compression successful with image optimization")
         return buffer
 
 
 def _compress_pypdf2(pdf_file, compression_level):
-    """PyPDF2 compression - 20-30% reduction"""
+    """PyPDF2 compression - 20-30% reduction - IMPROVED"""
+    
     pdf_file.seek(0)
     
     pdf_reader = PdfReader(pdf_file)
     pdf_writer = PdfWriter()
     
-    for page in pdf_reader.pages:
-        page.compress_content_streams()
-        pdf_writer.add_page(page)
+    # Process each page
+    for page_num, page in enumerate(pdf_reader.pages):
+        try:
+            # Compress content streams with maximum compression
+            if hasattr(page, 'compress_content_streams'):
+                page.compress_content_streams()
+            
+            pdf_writer.add_page(page)
+            
+        except Exception as e:
+            logger.warning(f"Error processing page {page_num}: {e}")
+            pdf_writer.add_page(page)
     
-    if compression_level in ['medium', 'high']:
-        pdf_writer.compress_identical_objects()
+    # Add compression to writer
+    if hasattr(pdf_writer, 'add_metadata'):
+        pdf_writer.add_metadata({'/Producer': 'PDFTools Compressor'})
     
+    # Write with compression
     buffer = io.BytesIO()
     pdf_writer.write(buffer)
+    buffer.seek(0)
     
+    logger.info("PyPDF2 compression completed")
     return buffer
 
 
@@ -255,6 +408,8 @@ LOGGING = {
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 """
+
+
 
 def convert(request):
     return render(request,'convert.html')

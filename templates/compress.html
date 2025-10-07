@@ -511,7 +511,24 @@
     </style>
 </head>
 <body>
-
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">PDFTools</a>
+            
+            <ul class="nav-links">
+                <li><a href="/merge">Merge PDF</a></li>
+                <li><a href="/split">Split PDF</a></li>
+                <li><a href="/compress">Compress PDF</a></li>
+                <li><a href="/convert">Convert</a></li>
+            </ul>
+            
+            <div class="nav-actions">
+                <a href="/login" class="btn-signin">Sign in</a>
+                <a href="/upload" class="btn-upload">Upload</a>
+            </div>
+        </div>
+    </nav>
 
     <!-- Main Content -->
     <div class="main-container">
@@ -659,6 +676,10 @@
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2024 PDFTools. All rights reserved.</p>
+    </footer>
 
     <script>
         const pdfInput = document.getElementById('pdfInput');
@@ -810,30 +831,100 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // Form submission
-        compressForm.addEventListener('submit', function(e) {
+        // Form submission with AJAX
+        compressForm.addEventListener('submit', async function(e) {
+            e.preventDefault(); // Prevent default form submission
+            
+            // Validation
+            if (!pdfInput.files.length) {
+                alert('❌ Please select a PDF file first!');
+                return;
+            }
+            
             // Show progress
             submitBtn.style.display = 'none';
             progressContainer.style.display = 'block';
             
-            // Simulate progress
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 10;
-                if (progress > 100) {
-                    progress = 100;
-                    clearInterval(interval);
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('pdf', pdfInput.files[0]);
+            formData.append('compression_level', compressionLevel.value);
+            
+            // Get CSRF token
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            try {
+                // Show initial progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 5;
+                    if (progress > 90) progress = 90; // Stop at 90%
+                    progressFill.style.width = progress + '%';
+                    progressText.textContent = `Compressing... ${Math.round(progress)}%`;
+                }, 300);
+                
+                // Send request to server
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                
+                clearInterval(progressInterval);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Compression failed');
                 }
                 
-                progressFill.style.width = progress + '%';
-                progressText.textContent = `Compressing... ${Math.round(progress)}%`;
-            }, 300);
-            
-            // Form will submit to Django backend
+                // Complete progress
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Compression complete! Downloading...';
+                
+                // Get the compressed file
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `compressed_${pdfInput.files[0].name}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Show success message
+                setTimeout(() => {
+                    alert('✅ PDF compressed successfully and downloaded!');
+                    resetForm();
+                }, 500);
+                
+            } catch (error) {
+                console.error('Compression error:', error);
+                alert('❌ ' + error.message);
+                submitBtn.style.display = 'flex';
+                progressContainer.style.display = 'none';
+            }
         });
+        
+        function resetForm() {
+            progressContainer.style.display = 'none';
+            submitBtn.style.display = 'flex';
+            progressFill.style.width = '0%';
+            uploadArea.classList.remove('has-file');
+            uploadIcon.className = 'fas fa-cloud-upload-alt upload-icon';
+            uploadText.textContent = 'Drop your PDF here or click to browse';
+            fileInfo.classList.remove('show');
+            pdfInput.value = '';
+            submitBtn.disabled = true;
+            currentFileSize = 0;
+            totalPages = 0;
+        }
     </script>
 </body>
 </html>
-
 
 {% endblock %} 
