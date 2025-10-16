@@ -8,10 +8,11 @@ from .forms import PDFUploadForm
 # Create your views here.
 from django.http import HttpResponse, JsonResponse, FileResponse
 from django.views.decorators.http import require_POST, require_GET
-from .forms import PDFMergeForm
 from PyPDF2 import PdfMerger,PdfReader, PdfWriter
 import io
-
+import uuid
+from django.views.decorators.csrf import csrf_exempt
+from pdf2docx import Converter
 def home(request):
     return render(request, 'index.html')
 
@@ -20,10 +21,6 @@ def auth(request):
 
 
 # views.py - COMPLETE SOLUTION IN ONE FUNCTION
-from django.shortcuts import render
-from django.http import FileResponse, JsonResponse
-from PyPDF2 import PdfReader, PdfWriter
-import io
 import os
 import tempfile
 import subprocess
@@ -355,63 +352,66 @@ def _compress_pypdf2(pdf_file, compression_level):
     return buffer
 
 
-# ============================================
-# REQUIREMENTS.TXT
-# ============================================
-"""
-Django>=4.0.0
-PyPDF2>=3.0.0
-pikepdf>=8.0.0
-
-# Optional but RECOMMENDED:
-# Install Ghostscript for best compression
-# Ubuntu/Debian: sudo apt-get install ghostscript
-# macOS: brew install ghostscript
-"""
 
 
-# ============================================
-# URLS.PY
-# ============================================
-"""
-from django.urls import path
-from . import views
-
-urlpatterns = [
-    path('compress/', views.compress_pdf, name='compress_pdf'),
-]
-"""
-
-
-# ============================================
-# SETTINGS.PY (Add these)
-# ============================================
-"""
-# Logging configuration
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        '': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
-    },
-}
-
-# File upload settings
-DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
-"""
-
-
-
+@csrf_exempt
 def convert(request):
+    """
+    Bitta funksiya:
+    - GET → sahifani render qiladi
+    - POST → PDFni DOCXga o‘giradi va yuklab beradi
+    """
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('pdf_file')
+
+        if not uploaded_file:
+            return HttpResponse("Iltimos, PDF fayl tanlang!", status=400)
+        
+        if uploaded_file.size > 30 * 1024 * 1024:
+            return HttpResponse("❌ Fayl juda katta! Maksimal 30 MB ruxsat etiladi.", status=400)
+
+
+        # Faylni vaqtincha saqlash
+        # pdf_filename = f"{uuid.uuid4()}.pdf"
+        pdf_filename = f"likepdf.pdf"
+        pdf_path = os.path.join(settings.MEDIA_ROOT, pdf_filename)
+        with open(pdf_path, 'wb+') as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+
+        try:
+            reader = PdfReader(pdf_path)
+            page_count = len(reader.pages)
+            if page_count > 50:
+                os.remove(pdf_path)
+                return HttpResponse(f"❌ PDF fayl juda katta! ({page_count} bet). Maksimal 50 bet ruxsat etiladi.", status=400)
+        except Exception as e:
+            os.remove(pdf_path)
+            return HttpResponse(f"❌ PDF faylni o‘qishda xatolik: {str(e)}", status=400)
+        
+        # DOCX fayl nomi
+        docx_path = pdf_path.replace(".pdf", ".docx")
+
+        # PDF → DOCX konvertatsiya
+        cv = Converter(pdf_path)
+        cv.convert(docx_path, start=0, end=None)
+        cv.close()
+
+        # Asl PDFni o‘chirish
+        os.remove(pdf_path)
+
+        # DOCX faylni foydalanuvchiga yuborish
+        response = FileResponse(
+            open(docx_path, 'rb'),
+            as_attachment=True,
+            filename=os.path.basename(docx_path)
+        )
+
+        # (xohlasa) DOCXni ham o‘chirish
+        # os.remove(docx_path)
+
+        return response
+
     return render(request,'convert.html')
 
 def editpdf(request):
@@ -517,6 +517,7 @@ def pdftojpg(request):
     return render(request,'pdftojpg.html')
 
 def pdftoword(request):
+    
     return render(request,'pdftoword.html')
 
 def price(request):

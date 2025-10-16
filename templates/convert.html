@@ -1,11 +1,411 @@
 {% extends "index.html" %}
 
-{% block title %}Compress {% endblock %}
+{% block title %}Convert {% endblock %}
 
 
 
 
 
 {% block content %}
+
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Word - PDFTools</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #333;
+        }
+
+        .navbar {
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 0 20px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #e53e3e;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 42px;
+            color: #1a202c;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #718096;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .upload-area {
+            border: 3px dashed #cbd5e0;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f7fafc;
+        }
+
+        .upload-area:hover {
+            border-color: #e53e3e;
+            background: #fed7d7;
+        }
+
+        .upload-area.has-file {
+            border-color: #48bb78;
+            background: #f0fff4;
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            color: #a0aec0;
+            margin-bottom: 20px;
+        }
+
+        .has-file .upload-icon {
+            color: #48bb78;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-info {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: transform 0.3s;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .submit-btn:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        .progress {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #edf2f7;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 32px;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">PDFTools</a>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-file-word"></i> PDF to Word</h1>
+            <p>Convert PDF to editable Word document in seconds</p>
+        </div>
+
+        <div class="card">
+            <form id="convertForm">
+                {% csrf_token %}
+                
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfInput').click()">
+                    <i class="fas fa-cloud-upload-alt upload-icon" id="uploadIcon"></i>
+                    <div class="upload-text" id="uploadText">Drop PDF here or click to browse</div>
+                </div>
+                
+                <input type="file" id="pdfInput" class="file-input" accept="application/pdf" required>
+                
+                <div class="file-info" id="fileInfo">
+                    <strong>📄 <span id="fileName"></span></strong> - <span id="fileSize"></span>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn" disabled>
+                    <i class="fas fa-exchange-alt"></i> Convert to Word
+                </button>
+
+                <div class="progress" id="progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Converting... 0%</div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const pdfInput = document.getElementById('pdfInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadIcon = document.getElementById('uploadIcon');
+        const uploadText = document.getElementById('uploadText');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const submitBtn = document.getElementById('submitBtn');
+        const convertForm = document.getElementById('convertForm');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+
+        // Drag & Drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#e53e3e';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#cbd5e0';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files[0]?.type === 'application/pdf') {
+                pdfInput.files = e.dataTransfer.files;
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        pdfInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (file.size > 50 * 1024 * 1024) {
+                alert('❌ File too large! Max 50MB');
+                return;
+            }
+
+            uploadArea.classList.add('has-file');
+            uploadIcon.className = 'fas fa-check-circle upload-icon';
+            uploadText.textContent = 'PDF selected!';
+            fileInfo.classList.add('show');
+            fileName.textContent = file.name;
+            fileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+            submitBtn.disabled = false;
+        }
+
+        // Form Submit
+        convertForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!pdfInput.files[0]) {
+                alert('❌ Please select a PDF file!');
+                return;
+            }
+
+            submitBtn.style.display = 'none';
+            progress.style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('pdf', pdfInput.files[0]);
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            try {
+                // Progress animation
+                let prog = 0;
+                const interval = setInterval(() => {
+                    prog += Math.random() * 5;
+                    if (prog > 90) prog = 90;
+                    progressFill.style.width = prog + '%';
+                    progressText.textContent = `Converting... ${Math.round(prog)}%`;
+                }, 300);
+
+                // Send request
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-CSRFToken': csrfToken}
+                });
+
+                clearInterval(interval);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error);
+                }
+
+                // Complete
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Done! Downloading...';
+
+                // Download
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = pdfInput.files[0].name.replace('.pdf', '.docx');
+                a.click();
+                URL.revokeObjectURL(url);
+
+                setTimeout(() => {
+                    alert('✅ Conversion successful!');
+                    reset();
+                }, 500);
+
+            } catch (error) {
+                alert('❌ ' + error.message);
+                submitBtn.style.display = 'block';
+                progress.style.display = 'none';
+            }
+        });
+
+        function reset() {
+            uploadArea.classList.remove('has-file');
+            uploadIcon.className = 'fas fa-cloud-upload-alt upload-icon';
+            uploadText.textContent = 'Drop PDF here or click to browse';
+            fileInfo.classList.remove('show');
+            pdfInput.value = '';
+            submitBtn.disabled = true;
+            submitBtn.style.display = 'block';
+            progress.style.display = 'none';
+            progressFill.style.width = '0%';
+        }
+    </script>
+</body>
+</html> {% endcomment %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Word - PDFTools</title>
+    {% comment %} <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f9fafb;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 { color: #e53e3e; margin-bottom: 20px; }
+        form {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        input[type=file] {
+            margin-bottom: 20px;
+        }
+        button {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #c53030;
+        }
+    </style> {% endcomment %}
+</head>
+<body>
+    <h1>PDF to Word Converter</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="pdf_file" accept=".pdf" required><br>
+        <button type="submit">Convert & Download</button>
+    </form>
+</body>
+</html>
+
 
 {% endblock %} 
